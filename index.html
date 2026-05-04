@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kōnane Leaderboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ks-navy:    #002147;
+    --ks-blue:    #004FA3;
+    --ks-gold:    #C8960C;
+    --ks-gold-lt: #F0C842;
+    --ks-white:   #FFFFFF;
+    --ks-silver:  #B0B8C1;
+    --ks-bg:      #001633;
+    --rank1: #C8960C;
+    --rank2: #8E9BAB;
+    --rank3: #A0633A;
+    --row-odd:  rgba(255,255,255,0.04);
+    --row-even: rgba(255,255,255,0.00);
+    --border:   rgba(255,255,255,0.10);
+    --glow:     rgba(200,150,12,0.18);
+  }
+
+  html, body {
+    height: 100%;
+    font-family: 'Lexend', sans-serif;
+    background: var(--ks-bg);
+    color: var(--ks-white);
+    overflow-x: hidden;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* ── BACKGROUND TEXTURE ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% -10%, rgba(0,79,163,0.35) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 40% at 90% 110%, rgba(200,150,12,0.12) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 28px 48px 20px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0,21,51,0.6);
+    backdrop-filter: blur(8px);
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .ks-logo {
+    width: 64px;
+    height: 64px;
+    flex-shrink: 0;
+  }
+
+  .header-titles h1 {
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ks-gold);
+    margin-bottom: 4px;
+  }
+
+  .header-titles h2 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--ks-white);
+    line-height: 1.1;
+  }
+
+  .header-right {
+    text-align: right;
+  }
+
+  .live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(200,150,12,0.15);
+    border: 1px solid rgba(200,150,12,0.4);
+    border-radius: 99px;
+    padding: 5px 14px 5px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ks-gold-lt);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #4cdb7a;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  #last-updated {
+    font-size: 12px;
+    color: var(--ks-silver);
+    font-weight: 300;
+  }
+
+  /* ── PODIUM ── */
+  .podium-section {
+    position: relative;
+    z-index: 1;
+    padding: 32px 48px 0;
+  }
+
+  .podium-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.1fr 1fr;
+    gap: 16px;
+    max-width: 700px;
+    margin: 0 auto;
+    align-items: end;
+  }
+
+  .podium-card {
+    border-radius: 12px;
+    padding: 20px 16px;
+    text-align: center;
+    border: 1px solid;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .podium-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+
+  .podium-card.rank-1 {
+    background: rgba(200,150,12,0.12);
+    border-color: rgba(200,150,12,0.45);
+    padding-top: 28px;
+  }
+  .podium-card.rank-1::before { background: linear-gradient(90deg, transparent, var(--ks-gold), transparent); }
+
+  .podium-card.rank-2 {
+    background: rgba(142,155,171,0.10);
+    border-color: rgba(142,155,171,0.35);
+  }
+  .podium-card.rank-2::before { background: linear-gradient(90deg, transparent, var(--ks-silver), transparent); }
+
+  .podium-card.rank-3 {
+    background: rgba(160,99,58,0.10);
+    border-color: rgba(160,99,58,0.35);
+  }
+  .podium-card.rank-3::before { background: linear-gradient(90deg, transparent, #A0633A, transparent); }
+
+  .podium-medal {
+    font-size: 30px;
+    margin-bottom: 8px;
+    display: block;
+    line-height: 1;
+  }
+
+  .podium-rank-num {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .rank-1 .podium-rank-num { color: var(--ks-gold); }
+  .rank-2 .podium-rank-num { color: var(--ks-silver); }
+  .rank-3 .podium-rank-num { color: #C8895A; }
+
+  .podium-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ks-white);
+    margin-bottom: 4px;
+    line-height: 1.2;
+  }
+
+  .podium-score {
+    font-size: 22px;
+    font-weight: 700;
+  }
+  .rank-1 .podium-score { color: var(--ks-gold-lt); }
+  .rank-2 .podium-score { color: #CFD8E0; }
+  .rank-3 .podium-score { color: #D8A87A; }
+
+  .podium-record {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--ks-silver);
+    margin-bottom: 6px;
+    letter-spacing: 0.05em;
+  }
+
+  .record-cell {
+    color: var(--ks-silver);
+    font-size: 13px;
+  }
+
+  .podium-pts {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--ks-silver);
+    margin-left: 3px;
+  }
+
+  /* ── TABLE SECTION ── */
+  .table-section {
+    position: relative;
+    z-index: 1;
+    padding: 28px 48px 40px;
+    flex: 1;
+  }
+
+  .table-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ks-silver);
+    margin-bottom: 12px;
+    padding-left: 4px;
+  }
+
+  .lb-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .lb-table thead tr {
+    background: rgba(0,79,163,0.3);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .lb-table th {
+    padding: 11px 16px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ks-silver);
+    text-align: left;
+  }
+
+  .lb-table th.right,
+  .lb-table td.right { text-align: right; }
+
+  .lb-table th.center,
+  .lb-table td.center { text-align: center; }
+
+  .lb-table tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    transition: background 0.15s;
+  }
+
+  .lb-table tbody tr:nth-child(odd) { background: var(--row-odd); }
+  .lb-table tbody tr:last-child { border-bottom: none; }
+  .lb-table tbody tr:hover { background: rgba(0,79,163,0.15); }
+
+  .lb-table td {
+    padding: 11px 16px;
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--ks-white);
+  }
+
+  .rank-cell {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ks-silver);
+    min-width: 36px;
+  }
+
+  .rank-cell.top3 {
+    font-size: 16px;
+  }
+
+  .name-cell {
+    font-weight: 500;
+  }
+
+  .score-cell {
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--ks-gold-lt);
+  }
+
+  .bar-cell {
+    width: 160px;
+  }
+
+  .bar-wrap {
+    height: 6px;
+    background: rgba(255,255,255,0.10);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 99px;
+    background: linear-gradient(90deg, var(--ks-blue), var(--ks-gold));
+    transition: width 0.6s ease;
+  }
+
+  /* ── LOADING / ERROR ── */
+  #loading-state {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 80px 0;
+    color: var(--ks-silver);
+    font-weight: 300;
+    font-size: 15px;
+  }
+
+  .spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid rgba(255,255,255,0.1);
+    border-top-color: var(--ks-gold);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #error-state {
+    position: relative;
+    z-index: 1;
+    display: none;
+    text-align: center;
+    padding: 60px 0;
+    color: #F09595;
+    font-size: 14px;
+  }
+
+  #error-state strong {
+    display: block;
+    font-size: 16px;
+    margin-bottom: 8px;
+    color: #F7C1C1;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    position: relative;
+    z-index: 1;
+    padding: 14px 48px;
+    border-top: 1px solid var(--border);
+    background: rgba(0,21,51,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: rgba(255,255,255,0.3);
+    font-weight: 300;
+  }
+
+  /* ── REFRESH BUTTON ── */
+  #refresh-btn {
+    background: rgba(0,79,163,0.3);
+    border: 1px solid rgba(0,79,163,0.5);
+    color: var(--ks-white);
+    padding: 6px 16px;
+    border-radius: 99px;
+    font-family: 'Lexend', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+    letter-spacing: 0.05em;
+  }
+
+  #refresh-btn:hover { background: rgba(0,79,163,0.55); }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <!-- KS Logo (SVG inline) -->
+    <svg class="ks-logo" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Kamehameha Schools">
+      <circle cx="32" cy="32" r="30" fill="#002147" stroke="#C8960C" stroke-width="2"/>
+      <text x="32" y="40" text-anchor="middle" font-family="Lexend,sans-serif" font-size="20" font-weight="700" fill="#C8960C">KS</text>
+    </svg>
+    <div class="header-titles">
+      <h1>Kamehameha Schools</h1>
+      <h2>Kōnane Leaderboard</h2>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-badge"><span class="live-dot"></span>Live</div>
+    <div id="last-updated">Fetching data…</div>
+  </div>
+</header>
+
+<div id="loading-state">
+  <div class="spinner"></div>
+  Loading leaderboard…
+</div>
+
+<div id="error-state">
+  <strong>Could not load leaderboard data</strong>
+  Check your connection or verify the spreadsheet is published publicly.
+</div>
+
+<div id="content" class="hidden">
+  <div class="podium-section">
+    <div class="podium-grid" id="podium"></div>
+  </div>
+  <div class="table-section">
+    <div class="table-label">Full Rankings</div>
+    <table class="lb-table">
+      <thead>
+        <tr>
+          <th class="center">#</th>
+          <th>Inoa</th>
+          <th class="center">Record</th>
+          <th class="right">Wins</th>
+          <th class="right bar-cell">Progress</th>
+        </tr>
+      </thead>
+      <tbody id="lb-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<footer>
+  <span>Kamehameha Schools · Honolulu, Hawaiʻi</span>
+  <button id="refresh-btn">↺ Refresh</button>
+</footer>
+
+<script>
+// Google Sheets visualization/tq endpoint — uses JSONP, bypasses CORS entirely
+// Your published spreadsheet's real Sheet ID (the short doc ID, not the publishing token)
+// We parse it from the pubhtml page via an iframe trick... 
+// Actually: use the gviz/tq endpoint with the publishing key directly
+const SHEET_ID = '1CWtdB_1y4bSB9yZgXFqTV1yB_TKbzXcBKLIR7ANXPO4';
+const GID = '319645049';
+
+const MEDALS = ['🥇','🥈','🥉'];
+const RANK_LABELS = ['1st Place','2nd Place','3rd Place'];
+
+function formatTime(d) {
+  return d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', second:'2-digit' });
+}
+
+const COL_NAME   = 0;
+const COL_WINS   = 1;
+const COL_LOSSES = 2;
+const COL_RECORD = 3;
+
+function buildPodium(top3) {
+  const orders = [1, 0, 2];
+  const rankClasses = ['rank-2','rank-1','rank-3'];
+  const podium = document.getElementById('podium');
+  podium.innerHTML = '';
+  orders.forEach((idx, pos) => {
+    if (!top3[idx]) return;
+    const row = top3[idx];
+    const card = document.createElement('div');
+    card.className = `podium-card ${rankClasses[pos]}`;
+    card.innerHTML = `
+      <span class="podium-medal">${MEDALS[idx]}</span>
+      <div class="podium-rank-num">${RANK_LABELS[idx]}</div>
+      <div class="podium-name">${row[COL_NAME]}</div>
+      <div class="podium-record">${row[COL_RECORD]}</div>
+      <div class="podium-score">${row[COL_WINS]}<span class="podium-pts">wins</span></div>
+    `;
+    podium.appendChild(card);
+  });
+}
+
+function buildTable(rows) {
+  const scores = rows.map(r => parseFloat(String(r[COL_WINS])) || 0);
+  const maxScore = Math.max(...scores);
+  const tbody = document.getElementById('lb-body');
+  tbody.innerHTML = '';
+  rows.forEach((row, i) => {
+    const rank = i + 1;
+    const wins = scores[i];
+    const pct = maxScore ? Math.round((wins / maxScore) * 100) : 0;
+    const isTop3 = rank <= 3;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="center rank-cell ${isTop3 ? 'top3' : ''}">${isTop3 ? MEDALS[rank-1] : rank}</td>
+      <td class="name-cell">${row[COL_NAME]}</td>
+      <td class="center record-cell">${row[COL_RECORD]}</td>
+      <td class="right score-cell">${wins}</td>
+      <td class="right bar-cell">
+        <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%"></div></div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function showError(msg) {
+  const loading = document.getElementById('loading-state');
+  const error = document.getElementById('error-state');
+  const updated = document.getElementById('last-updated');
+  loading.classList.add('hidden');
+  error.style.display = 'block';
+  error.innerHTML = `<strong>Could not load leaderboard data</strong>${msg}`;
+  updated.textContent = 'Last attempt: ' + formatTime(new Date());
+}
+
+function loadLeaderboard() {
+  const loading = document.getElementById('loading-state');
+  const error = document.getElementById('error-state');
+  const content = document.getElementById('content');
+  const updated = document.getElementById('last-updated');
+
+  loading.classList.remove('hidden');
+  error.style.display = 'none';
+  content.classList.add('hidden');
+
+  // Unique callback name to avoid collisions on refresh
+  const cbName = 'gsCallback_' + Date.now();
+
+  // Timeout in case script never calls back
+  const timer = setTimeout(() => {
+    delete window[cbName];
+    showError('Request timed out. Check that the sheet is published publicly.');
+  }, 10000);
+
+  window[cbName] = function(response) {
+    clearTimeout(timer);
+    delete window[cbName];
+    try {
+      if (response.status === 'error') throw new Error(response.errors?.[0]?.detailed_message || 'Sheet error');
+      const table = response.table;
+      const cols = table.cols;
+
+      // Convert rows to simple arrays: [Inoa, Wins, Losses, Record]
+      const rows = table.rows
+        .map(r => r.c.map(cell => cell ? (cell.f !== undefined ? cell.f : cell.v) : ''))
+        .filter(r => r[COL_NAME] && String(r[COL_NAME]).trim() !== '');
+
+      // Sort by Wins desc, then Losses asc
+      rows.sort((a, b) => {
+        const aw = parseFloat(String(a[COL_WINS])) || 0;
+        const bw = parseFloat(String(b[COL_WINS])) || 0;
+        if (bw !== aw) return bw - aw;
+        const al = parseFloat(String(a[COL_LOSSES])) || 0;
+        const bl = parseFloat(String(b[COL_LOSSES])) || 0;
+        return al - bl;
+      });
+
+      buildPodium(rows.slice(0, 3));
+      buildTable(rows);
+
+      loading.classList.add('hidden');
+      content.classList.remove('hidden');
+      updated.textContent = 'Updated ' + formatTime(new Date());
+    } catch(e) {
+      showError(e.message);
+    }
+  };
+
+  // Inject JSONP script tag — Google's gviz/tq endpoint supports this natively
+  const script = document.createElement('script');
+  script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json;responseHandler:${cbName}`;
+  script.onerror = () => { clearTimeout(timer); showError('Failed to reach Google Sheets.'); };
+  document.head.appendChild(script);
+}
+
+document.getElementById('refresh-btn').addEventListener('click', loadLeaderboard);
+loadLeaderboard();
+setInterval(loadLeaderboard, 60000);
+</script>
+</body>
+</html>
