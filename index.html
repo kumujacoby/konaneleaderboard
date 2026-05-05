@@ -298,9 +298,58 @@
   #refresh-btn:hover { background: rgba(0,79,163,0.55); }
 
   .hidden { display: none !important; }
+
+  /* Tooltip */
+  .name-cell { position: relative; cursor: default; }
+
+  .tooltip {
+    display: none;
+    position: fixed;
+    z-index: 100;
+    background: #0a1f3a;
+    border: 1px solid rgba(0,79,163,0.6);
+    border-radius: 10px;
+    padding: 14px 16px;
+    min-width: 220px;
+    max-width: 300px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    pointer-events: none;
+  }
+  .tooltip.visible { display: block; }
+
+  .tooltip-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ks-white);
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .tooltip-section { margin-bottom: 8px; }
+  .tooltip-section:last-child { margin-bottom: 0; }
+  .tooltip-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .tooltip-label.wins   { color: var(--ks-gold-lt); }
+  .tooltip-label.losses { color: #C89090; }
+  .tooltip-names {
+    font-size: 12px;
+    font-weight: 400;
+    color: rgba(255,255,255,0.8);
+    line-height: 1.6;
+  }
 </style>
 </head>
 <body>
+
+<div id="tooltip" class="tooltip">
+  <div class="tooltip-name" id="tt-name"></div>
+  <div id="tt-body"></div>
+</div>
 
 <header>
   <div class="header-titles">
@@ -343,8 +392,13 @@
 </footer>
 
 <script>
-const SHEET_ID = '1CWtdB_1y4bSB9yZgXFqTV1yB_TKbzXcBKLIR7ANXPO4';
-const GID = '319645049';
+const SHEET_ID  = '1CWtdB_1y4bSB9yZgXFqTV1yB_TKbzXcBKLIR7ANXPO4';
+const GID       = '319645049';
+const GID_MATCHES = '0'; // first sheet with match log
+
+// matchMap: { playerName -> { wins: Set of opponents, losses: Set of opponents } }
+// keyed by opponent+timestamp to deduplicate game-1/game-2 of same sitting
+let matchMap = {};
 
 const COL_NAME   = 0;
 const COL_WINS   = 1;
@@ -419,6 +473,9 @@ function buildTable(rows) {
       <td class="name-cell tier-${tier}">${row[COL_NAME]}</td>
       <td class="right record-cell ${recClass}">${row[COL_RECORD]}</td>
     `;
+    const nameCell = tr.querySelector('.name-cell');
+    nameCell.addEventListener('mouseenter', e => showTooltip(row[COL_NAME], e));
+    nameCell.addEventListener('mouseleave', hideTooltip);
     tbody.appendChild(tr);
   });
 }
@@ -441,6 +498,11 @@ function loadLeaderboard() {
   error.style.display = 'none';
   content.classList.add('hidden');
 
+  // Load match data first, then standings
+  loadMatches(() => loadStandings(loading, error, content, updated));
+}
+
+function loadStandings(loading, error, content, updated) {
   const cbName = 'gsCallback_' + Date.now();
 
   const timer = setTimeout(() => {
@@ -481,6 +543,97 @@ function loadLeaderboard() {
   const script = document.createElement('script');
   script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json;responseHandler:${cbName}`;
   script.onerror = () => { clearTimeout(timer); showError('Failed to reach Google Sheets.'); };
+  document.head.appendChild(script);
+}
+
+// ── Tooltip ──────────────────────────────────────────────
+const tooltip  = document.getElementById('tooltip');
+const ttName   = document.getElementById('tt-name');
+const ttBody   = document.getElementById('tt-body');
+
+document.addEventListener('mousemove', e => {
+  if (!tooltip.classList.contains('visible')) return;
+  const pad = 16;
+  let x = e.clientX + pad;
+  let y = e.clientY + pad;
+  if (x + 320 > window.innerWidth)  x = e.clientX - 320 - pad;
+  if (y + 200 > window.innerHeight) y = e.clientY - 200 - pad;
+  tooltip.style.left = x + 'px';
+  tooltip.style.top  = y + 'px';
+});
+
+function showTooltip(name, e) {
+  const data = matchMap[name];
+  if (!data) return;
+
+  ttName.textContent = name;
+  ttBody.innerHTML = '';
+
+  if (data.wins.size > 0) {
+    const sec = document.createElement('div');
+    sec.className = 'tooltip-section';
+    sec.innerHTML = `<div class="tooltip-label wins">Wins</div>
+      <div class="tooltip-names">${[...data.wins].join('<br>')}</div>`;
+    ttBody.appendChild(sec);
+  }
+
+  if (data.losses.size > 0) {
+    const sec = document.createElement('div');
+    sec.className = 'tooltip-section';
+    sec.innerHTML = `<div class="tooltip-label losses">Losses</div>
+      <div class="tooltip-names">${[...data.losses].join('<br>')}</div>`;
+    ttBody.appendChild(sec);
+  }
+
+  tooltip.classList.add('visible');
+}
+
+function hideTooltip() {
+  tooltip.classList.remove('visible');
+}
+
+// ── Match sheet loader ────────────────────────────────────
+// Columns: Lā(0) Inoa(1) Pāʻani(2) Result(3) Opponent(4) Timestamp(5)
+const MC_NAME      = 1;
+const MC_RESULT    = 3;
+const MC_OPPONENT  = 4;
+const MC_TIMESTAMP = 5;
+
+function loadMatches(callback) {
+  const cbName = 'matchCallback_' + Date.now();
+  const timer = setTimeout(() => { delete window[cbName]; callback(); }, 8000);
+
+  window[cbName] = function(response) {
+    clearTimeout(timer);
+    delete window[cbName];
+    try {
+      matchMap = {};
+      const seen = new Set(); // dedupe key: player|opponent|timestamp
+
+      response.table.rows.forEach(r => {
+        const cells = r.c.map(cell => cell ? (cell.f !== undefined ? cell.f : cell.v) : '');
+        const name      = String(cells[MC_NAME]      || '').trim();
+        const result    = String(cells[MC_RESULT]    || '').trim().toUpperCase();
+        const opponent  = String(cells[MC_OPPONENT]  || '').trim();
+        const timestamp = String(cells[MC_TIMESTAMP] || '').trim();
+        if (!name || !opponent || (result !== 'W' && result !== 'L')) return;
+
+        // Deduplicate: one entry per (player, opponent, timestamp sitting)
+        const key = `${name}|${opponent}|${timestamp}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+
+        if (!matchMap[name]) matchMap[name] = { wins: new Set(), losses: new Set() };
+        if (result === 'W') matchMap[name].wins.add(opponent);
+        else                matchMap[name].losses.add(opponent);
+      });
+    } catch(e) { /* silently fall back */ }
+    callback();
+  };
+
+  const script = document.createElement('script');
+  script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID_MATCHES}&tqx=out:json;responseHandler:${cbName}`;
+  script.onerror = () => { clearTimeout(timer); delete window[cbName]; callback(); };
   document.head.appendChild(script);
 }
 
