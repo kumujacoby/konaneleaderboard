@@ -618,8 +618,8 @@ function loadMatches(callback) {
         const timestamp = String(cells[MC_TIMESTAMP] || '').trim();
         if (!name || !opponent || (result !== 'W' && result !== 'L')) return;
 
-        // Deduplicate: one entry per (player, opponent, timestamp sitting)
-        const key = `${name}|${opponent}|${timestamp}`;
+        // Deduplicate: one W and one L per (player, opponent, timestamp sitting)
+        const key = `${name}|${opponent}|${timestamp}|${result}`;
         if (seen.has(key)) return;
         seen.add(key);
 
