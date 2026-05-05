@@ -562,7 +562,12 @@ document.addEventListener('mousemove', e => {
   tooltip.style.top  = y + 'px';
 });
 
+function isTouchDevice() {
+  return window.matchMedia('(hover: none)').matches;
+}
+
 function showTooltip(name, e) {
+  if (isTouchDevice()) return;
   const data = matchMap[name];
   if (!data) return;
 
