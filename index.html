@@ -324,11 +324,10 @@
 
 <div id="content" class="hidden">
   <div class="table-section">
-    <div class="table-label">Rankings</div>
     <table class="lb-table">
       <thead>
         <tr>
-          <th class="center">#</th>
+          <th class="center">Rank</th>
           <th>Inoa</th>
           <th class="right">Record</th>
         </tr>
@@ -393,8 +392,27 @@ function buildTable(rows) {
   const tbody = document.getElementById('lb-body');
   tbody.innerHTML = '';
 
+  // Pre-compute tied ranks: same wins+losses = same rank, next rank skips ahead
+  const rankMap = [];
+  let currentRank = 1;
+  tiered.forEach(({ row }, i) => {
+    if (i === 0) {
+      rankMap.push(currentRank);
+    } else {
+      const prev = tiered[i - 1].row;
+      const sameWins   = (parseFloat(String(row[COL_WINS]))   || 0) === (parseFloat(String(prev[COL_WINS]))   || 0);
+      const sameLosses = (parseFloat(String(row[COL_LOSSES])) || 0) === (parseFloat(String(prev[COL_LOSSES])) || 0);
+      if (sameWins && sameLosses) {
+        rankMap.push(currentRank); // tied — same rank
+      } else {
+        currentRank = i + 1;      // skip ahead
+        rankMap.push(currentRank);
+      }
+    }
+  });
+
   tiered.forEach(({ row, tier }, i) => {
-    const rank = i + 1;
+    const rank = rankMap[i];
     const wins   = parseFloat(String(row[COL_WINS]))   || 0;
     const losses = parseFloat(String(row[COL_LOSSES])) || 0;
     const recClass = recordClass(wins, losses);
