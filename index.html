@@ -191,7 +191,7 @@
   .name-cell.tier-1 { /* top record */
     font-size: 22px;
     font-weight: 800;
-    color: var(--ks-white);
+    color: var(--ks-gold-lt);
     letter-spacing: -0.01em;
   }
 
@@ -392,22 +392,18 @@ function buildTable(rows) {
   const tbody = document.getElementById('lb-body');
   tbody.innerHTML = '';
 
-  // Pre-compute tied ranks: same wins+losses = same rank, next rank skips ahead
+  // Banzuke tier-style: rank = number of distinct record tiers above you + 1
   const rankMap = [];
-  let currentRank = 1;
+  let tierRank = 1;
   tiered.forEach(({ row }, i) => {
     if (i === 0) {
-      rankMap.push(currentRank);
+      rankMap.push(tierRank);
     } else {
       const prev = tiered[i - 1].row;
       const sameWins   = (parseFloat(String(row[COL_WINS]))   || 0) === (parseFloat(String(prev[COL_WINS]))   || 0);
       const sameLosses = (parseFloat(String(row[COL_LOSSES])) || 0) === (parseFloat(String(prev[COL_LOSSES])) || 0);
-      if (sameWins && sameLosses) {
-        rankMap.push(currentRank); // tied — same rank
-      } else {
-        currentRank = i + 1;      // skip ahead
-        rankMap.push(currentRank);
-      }
+      if (!sameWins || !sameLosses) tierRank++; // new distinct tier
+      rankMap.push(tierRank);
     }
   });
 
