@@ -68,9 +68,7 @@
     line-height: 1.1;
   }
 
-  .header-right {
-    text-align: right;
-  }
+  .header-right { text-align: right; }
 
   .live-badge {
     display: inline-flex;
@@ -112,16 +110,6 @@
     z-index: 1;
     padding: 32px 48px 40px;
     flex: 1;
-  }
-
-  .table-label {
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--ks-silver);
-    margin-bottom: 12px;
-    padding-left: 4px;
   }
 
   .lb-table {
@@ -176,11 +164,11 @@
     vertical-align: middle;
   }
 
-  /* Banzuke-style name scaling — 5 tiers */
   .name-cell {
+    position: relative;
+    cursor: default;
     vertical-align: middle;
     line-height: 1.15;
-    /* default / lowest tier */
     font-size: 13px;
     font-weight: 400;
     color: rgba(255,255,255,0.75);
@@ -188,7 +176,7 @@
     padding-bottom: 10px;
   }
 
-  .name-cell.tier-1 { /* top record */
+  .name-cell.tier-1 {
     font-size: 22px;
     font-weight: 800;
     color: var(--ks-gold-lt);
@@ -213,8 +201,6 @@
     color: rgba(255,255,255,0.82);
   }
 
-  /* tier-5 is the default .name-cell */
-
   .record-cell {
     color: var(--ks-silver);
     font-size: 13px;
@@ -222,7 +208,6 @@
     white-space: nowrap;
   }
 
-  /* Color-code record by win/loss ratio */
   .record-cell.undefeated { color: var(--ks-gold-lt); font-weight: 600; }
   .record-cell.winning    { color: #7EC8A0; }
   .record-cell.even       { color: var(--ks-silver); }
@@ -300,8 +285,6 @@
   .hidden { display: none !important; }
 
   /* Tooltip */
-  .name-cell { position: relative; cursor: default; }
-
   .tooltip {
     display: none;
     position: fixed;
@@ -392,12 +375,10 @@
 </footer>
 
 <script>
-const SHEET_ID  = '1CWtdB_1y4bSB9yZgXFqTV1yB_TKbzXcBKLIR7ANXPO4';
-const GID       = '319645049';
-const GID_MATCHES = '0'; // first sheet with match log
+const SHEET_ID    = '1CWtdB_1y4bSB9yZgXFqTV1yB_TKbzXcBKLIR7ANXPO4';
+const GID         = '319645049';
+const GID_MATCHES = '0';
 
-// matchMap: { playerName -> { wins: Set of opponents, losses: Set of opponents } }
-// keyed by opponent+timestamp to deduplicate game-1/game-2 of same sitting
 let matchMap = {};
 
 const COL_NAME   = 0;
@@ -409,27 +390,21 @@ function formatTime(d) {
   return d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', second:'2-digit' });
 }
 
-// Assign a tier 1–5 based on where a player's wins fall in the distribution
 function assignTiers(rows) {
   if (!rows.length) return [];
-
   const scores = rows.map(r => parseFloat(String(r[COL_WINS])) || 0);
   const max = Math.max(...scores);
   const min = Math.min(...scores);
   const range = max - min;
-
   return rows.map((row, i) => {
     const wins = scores[i];
-    // Normalize 0–1 within the field's range
     const norm = range > 0 ? (wins - min) / range : 1;
-
     let tier;
     if (norm >= 0.90)      tier = 1;
     else if (norm >= 0.70) tier = 2;
     else if (norm >= 0.45) tier = 3;
     else if (norm >= 0.20) tier = 4;
     else                   tier = 5;
-
     return { row, tier, wins };
   });
 }
@@ -446,7 +421,6 @@ function buildTable(rows) {
   const tbody = document.getElementById('lb-body');
   tbody.innerHTML = '';
 
-  // Banzuke tier-style: rank = number of distinct record tiers above you + 1
   const rankMap = [];
   let tierRank = 1;
   tiered.forEach(({ row }, i) => {
@@ -456,17 +430,16 @@ function buildTable(rows) {
       const prev = tiered[i - 1].row;
       const sameWins   = (parseFloat(String(row[COL_WINS]))   || 0) === (parseFloat(String(prev[COL_WINS]))   || 0);
       const sameLosses = (parseFloat(String(row[COL_LOSSES])) || 0) === (parseFloat(String(prev[COL_LOSSES])) || 0);
-      if (!sameWins || !sameLosses) tierRank++; // new distinct tier
+      if (!sameWins || !sameLosses) tierRank++;
       rankMap.push(tierRank);
     }
   });
 
   tiered.forEach(({ row, tier }, i) => {
-    const rank = rankMap[i];
+    const rank   = rankMap[i];
     const wins   = parseFloat(String(row[COL_WINS]))   || 0;
     const losses = parseFloat(String(row[COL_LOSSES])) || 0;
     const recClass = recordClass(wins, losses);
-
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="center rank-cell">${rank}</td>
@@ -488,68 +461,10 @@ function showError(msg) {
   document.getElementById('last-updated').textContent = 'Last attempt: ' + formatTime(new Date());
 }
 
-function loadLeaderboard() {
-  const loading = document.getElementById('loading-state');
-  const error   = document.getElementById('error-state');
-  const content = document.getElementById('content');
-  const updated = document.getElementById('last-updated');
-
-  loading.classList.remove('hidden');
-  error.style.display = 'none';
-  content.classList.add('hidden');
-
-  // Load match data first, then standings
-  loadMatches(() => loadStandings(loading, error, content, updated));
-}
-
-function loadStandings(loading, error, content, updated) {
-  const cbName = 'gsCallback_' + Date.now();
-
-  const timer = setTimeout(() => {
-    delete window[cbName];
-    showError('Request timed out. Check that the sheet is published publicly.');
-  }, 10000);
-
-  window[cbName] = function(response) {
-    clearTimeout(timer);
-    delete window[cbName];
-    try {
-      if (response.status === 'error') throw new Error(response.errors?.[0]?.detailed_message || 'Sheet error');
-
-      const rows = response.table.rows
-        .map(r => r.c.map(cell => cell ? (cell.f !== undefined ? cell.f : cell.v) : ''))
-        .filter(r => r[COL_NAME] && String(r[COL_NAME]).trim() !== '');
-
-      // Sort: most wins first; on tie, fewer losses first; otherwise preserve sheet order
-      rows.sort((a, b) => {
-        const aw = parseFloat(String(a[COL_WINS]))   || 0;
-        const bw = parseFloat(String(b[COL_WINS]))   || 0;
-        if (bw !== aw) return bw - aw;
-        const al = parseFloat(String(a[COL_LOSSES])) || 0;
-        const bl = parseFloat(String(b[COL_LOSSES])) || 0;
-        return al - bl;
-      });
-
-      buildTable(rows);
-
-      loading.classList.add('hidden');
-      content.classList.remove('hidden');
-      updated.textContent = 'Updated ' + formatTime(new Date());
-    } catch(e) {
-      showError(e.message);
-    }
-  };
-
-  const script = document.createElement('script');
-  script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json;responseHandler:${cbName}`;
-  script.onerror = () => { clearTimeout(timer); showError('Failed to reach Google Sheets.'); };
-  document.head.appendChild(script);
-}
-
-// ── Tooltip ──────────────────────────────────────────────
-const tooltip  = document.getElementById('tooltip');
-const ttName   = document.getElementById('tt-name');
-const ttBody   = document.getElementById('tt-body');
+// ── Tooltip ───────────────────────────────────────────────
+const tooltip = document.getElementById('tooltip');
+const ttName  = document.getElementById('tt-name');
+const ttBody  = document.getElementById('tt-body');
 
 document.addEventListener('mousemove', e => {
   if (!tooltip.classList.contains('visible')) return;
@@ -566,14 +481,12 @@ function isTouchDevice() {
   return window.matchMedia('(hover: none)').matches;
 }
 
-function showTooltip(name, e) {
+function showTooltip(name) {
   if (isTouchDevice()) return;
   const data = matchMap[name];
   if (!data) return;
-
   ttName.textContent = name;
   ttBody.innerHTML = '';
-
   if (data.wins.size > 0) {
     const sec = document.createElement('div');
     sec.className = 'tooltip-section';
@@ -581,7 +494,6 @@ function showTooltip(name, e) {
       <div class="tooltip-names">${[...data.wins].join('<br>')}</div>`;
     ttBody.appendChild(sec);
   }
-
   if (data.losses.size > 0) {
     const sec = document.createElement('div');
     sec.className = 'tooltip-section';
@@ -589,7 +501,6 @@ function showTooltip(name, e) {
       <div class="tooltip-names">${[...data.losses].join('<br>')}</div>`;
     ttBody.appendChild(sec);
   }
-
   tooltip.classList.add('visible');
 }
 
@@ -598,7 +509,6 @@ function hideTooltip() {
 }
 
 // ── Match sheet loader ────────────────────────────────────
-// Columns: Lā(0) Inoa(1) Pāʻani(2) Result(3) Opponent(4) Timestamp(5)
 const MC_NAME      = 1;
 const MC_RESULT    = 3;
 const MC_OPPONENT  = 4;
@@ -607,27 +517,22 @@ const MC_TIMESTAMP = 5;
 function loadMatches(callback) {
   const cbName = 'matchCallback_' + Date.now();
   const timer = setTimeout(() => { delete window[cbName]; callback(); }, 8000);
-
   window[cbName] = function(response) {
     clearTimeout(timer);
     delete window[cbName];
     try {
       matchMap = {};
-      const seen = new Set(); // dedupe key: player|opponent|timestamp
-
+      const seen = new Set();
       response.table.rows.forEach(r => {
-        const cells = r.c.map(cell => cell ? (cell.f !== undefined ? cell.f : cell.v) : '');
+        const cells     = r.c.map(cell => cell ? (cell.f !== undefined ? cell.f : cell.v) : '');
         const name      = String(cells[MC_NAME]      || '').trim();
         const result    = String(cells[MC_RESULT]    || '').trim().toUpperCase();
         const opponent  = String(cells[MC_OPPONENT]  || '').trim();
         const timestamp = String(cells[MC_TIMESTAMP] || '').trim();
         if (!name || !opponent || (result !== 'W' && result !== 'L')) return;
-
-        // Deduplicate: one W and one L per (player, opponent, timestamp sitting)
         const key = `${name}|${opponent}|${timestamp}|${result}`;
         if (seen.has(key)) return;
         seen.add(key);
-
         if (!matchMap[name]) matchMap[name] = { wins: new Set(), losses: new Set() };
         if (result === 'W') matchMap[name].wins.add(opponent);
         else                matchMap[name].losses.add(opponent);
@@ -635,16 +540,62 @@ function loadMatches(callback) {
     } catch(e) { /* silently fall back */ }
     callback();
   };
-
   const script = document.createElement('script');
   script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID_MATCHES}&tqx=out:json;responseHandler:${cbName}`;
   script.onerror = () => { clearTimeout(timer); delete window[cbName]; callback(); };
   document.head.appendChild(script);
 }
 
+// ── Main ──────────────────────────────────────────────────
+function loadLeaderboard() {
+  const loading = document.getElementById('loading-state');
+  const error   = document.getElementById('error-state');
+  const content = document.getElementById('content');
+  const updated = document.getElementById('last-updated');
+  loading.classList.remove('hidden');
+  error.style.display = 'none';
+  content.classList.add('hidden');
+  loadMatches(() => loadStandings(loading, error, content, updated));
+}
+
+function loadStandings(loading, error, content, updated) {
+  const cbName = 'gsCallback_' + Date.now();
+  const timer = setTimeout(() => {
+    delete window[cbName];
+    showError('Request timed out. Check that the sheet is published publicly.');
+  }, 10000);
+  window[cbName] = function(response) {
+    clearTimeout(timer);
+    delete window[cbName];
+    try {
+      if (response.status === 'error') throw new Error(response.errors?.[0]?.detailed_message || 'Sheet error');
+      const rows = response.table.rows
+        .map(r => r.c.map(cell => cell ? (cell.f !== undefined ? cell.f : cell.v) : ''))
+        .filter(r => r[COL_NAME] && String(r[COL_NAME]).trim() !== '');
+      rows.sort((a, b) => {
+        const aw = parseFloat(String(a[COL_WINS]))   || 0;
+        const bw = parseFloat(String(b[COL_WINS]))   || 0;
+        if (bw !== aw) return bw - aw;
+        const al = parseFloat(String(a[COL_LOSSES])) || 0;
+        const bl = parseFloat(String(b[COL_LOSSES])) || 0;
+        return al - bl;
+      });
+      buildTable(rows);
+      loading.classList.add('hidden');
+      content.classList.remove('hidden');
+      updated.textContent = 'Updated ' + formatTime(new Date());
+    } catch(e) {
+      showError(e.message);
+    }
+  };
+  const script = document.createElement('script');
+  script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json;responseHandler:${cbName}`;
+  script.onerror = () => { clearTimeout(timer); showError('Failed to reach Google Sheets.'); };
+  document.head.appendChild(script);
+}
+
 document.getElementById('refresh-btn').addEventListener('click', loadLeaderboard);
 loadLeaderboard();
-setInterval(loadLeaderboard, 60000);
 </script>
 </body>
 </html>
