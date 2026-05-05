@@ -42,7 +42,6 @@
     padding: 0;
   }
 
-  /* ── BACKGROUND TEXTURE ── */
   body::before {
     content: '';
     position: fixed;
@@ -54,7 +53,6 @@
     z-index: 0;
   }
 
-  /* ── HEADER ── */
   header {
     position: relative;
     z-index: 1;
@@ -71,21 +69,6 @@
     display: flex;
     align-items: center;
     gap: 20px;
-  }
-
-  .ks-logo {
-    width: 64px;
-    height: 64px;
-    flex-shrink: 0;
-  }
-
-  .header-titles h1 {
-    font-size: 13px;
-    font-weight: 400;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--ks-gold);
-    margin-bottom: 4px;
   }
 
   .header-titles h2 {
@@ -135,7 +118,6 @@
     font-weight: 300;
   }
 
-  /* ── PODIUM ── */
   .podium-section {
     position: relative;
     z-index: 1;
@@ -240,7 +222,6 @@
     margin-left: 3px;
   }
 
-  /* ── TABLE SECTION ── */
   .table-section {
     position: relative;
     z-index: 1;
@@ -342,7 +323,6 @@
     transition: width 0.6s ease;
   }
 
-  /* ── LOADING / ERROR ── */
   #loading-state {
     position: relative;
     z-index: 1;
@@ -382,7 +362,6 @@
     color: #F7C1C1;
   }
 
-  /* ── FOOTER ── */
   footer {
     position: relative;
     z-index: 1;
@@ -397,7 +376,6 @@
     font-weight: 300;
   }
 
-  /* ── REFRESH BUTTON ── */
   #refresh-btn {
     background: rgba(0,79,163,0.3);
     border: 1px solid rgba(0,79,163,0.5);
@@ -421,13 +399,7 @@
 
 <header>
   <div class="header-left">
-    <!-- KS Logo (SVG inline) -->
-    <svg class="ks-logo" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Kamehameha Schools">
-      <circle cx="32" cy="32" r="30" fill="#002147" stroke="#C8960C" stroke-width="2"/>
-      <text x="32" y="40" text-anchor="middle" font-family="Lexend,sans-serif" font-size="20" font-weight="700" fill="#C8960C">KS</text>
-    </svg>
     <div class="header-titles">
-      <h1>Kamehameha Schools</h1>
       <h2>Kōnane Leaderboard</h2>
     </div>
   </div>
@@ -469,15 +441,11 @@
 </div>
 
 <footer>
-  <span>Kamehameha Schools · Honolulu, Hawaiʻi</span>
+  <span></span>
   <button id="refresh-btn">↺ Refresh</button>
 </footer>
 
 <script>
-// Google Sheets visualization/tq endpoint — uses JSONP, bypasses CORS entirely
-// Your published spreadsheet's real Sheet ID (the short doc ID, not the publishing token)
-// We parse it from the pubhtml page via an iframe trick... 
-// Actually: use the gviz/tq endpoint with the publishing key directly
 const SHEET_ID = '1CWtdB_1y4bSB9yZgXFqTV1yB_TKbzXcBKLIR7ANXPO4';
 const GID = '319645049';
 
@@ -558,10 +526,8 @@ function loadLeaderboard() {
   error.style.display = 'none';
   content.classList.add('hidden');
 
-  // Unique callback name to avoid collisions on refresh
   const cbName = 'gsCallback_' + Date.now();
 
-  // Timeout in case script never calls back
   const timer = setTimeout(() => {
     delete window[cbName];
     showError('Request timed out. Check that the sheet is published publicly.');
@@ -573,14 +539,11 @@ function loadLeaderboard() {
     try {
       if (response.status === 'error') throw new Error(response.errors?.[0]?.detailed_message || 'Sheet error');
       const table = response.table;
-      const cols = table.cols;
 
-      // Convert rows to simple arrays: [Inoa, Wins, Losses, Record]
       const rows = table.rows
         .map(r => r.c.map(cell => cell ? (cell.f !== undefined ? cell.f : cell.v) : ''))
         .filter(r => r[COL_NAME] && String(r[COL_NAME]).trim() !== '');
 
-      // Sort by Wins desc, then Losses asc
       rows.sort((a, b) => {
         const aw = parseFloat(String(a[COL_WINS])) || 0;
         const bw = parseFloat(String(b[COL_WINS])) || 0;
@@ -601,7 +564,6 @@ function loadLeaderboard() {
     }
   };
 
-  // Inject JSONP script tag — Google's gviz/tq endpoint supports this natively
   const script = document.createElement('script');
   script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json;responseHandler:${cbName}`;
   script.onerror = () => { clearTimeout(timer); showError('Failed to reach Google Sheets.'); };
